@@ -1,0 +1,4 @@
+*.png
+*.o
+*.wasm
+ascii_generator

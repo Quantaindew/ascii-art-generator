@@ -4,3 +4,9 @@
 ascii_generator
 *.txt
 codebase.md
+.data
+*.jpg*
+*.jpeg
+*.gif
+*.bmp
+*.tiff

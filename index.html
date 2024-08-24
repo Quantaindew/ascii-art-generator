@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Art Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        #dropzone {
+            border: 2px dashed #ccc;
+            border-radius: 20px;
+            width: 100%;
+            height: 200px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #dropzone:hover {
+            background-color: #e0e0e0;
+        }
+        #dropzone.dragover {
+            background-color: #d0d0d0;
+        }
+        #output {
+            white-space: pre;
+            font-family: monospace;
+            font-size: 8px;
+            line-height: 1;
+            overflow: auto;
+            background-color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        #width-input {
+            margin-top: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #width-input input {
+            width: 60px;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>ASCII Art Generator</h1>
+    <div id="dropzone">Drop an image here or click to upload</div>
+    <div id="width-input">
+        <label for="output-width">Output Width:</label>
+        <input type="number" id="output-width" value="100" min="1" max="1000">
+    </div>
+    <div id="output"></div>
+
+    <script src="ascii_generator.js"></script>
+    <script>
+        let wasmModule;
+
+        Module.onRuntimeInitialized = async () => {
+            wasmModule = Module;
+            console.log('WebAssembly module loaded');
+        };
+
+        const dropzone = document.getElementById('dropzone');
+        const output = document.getElementById('output');
+        const outputWidthInput = document.getElementById('output-width');
+
+        dropzone.addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = handleFile;
+            input.click();
+        });
+
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('dragover');
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('dragover');
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                handleFile({ target: { files: [file] } });
+            }
+        });
+
+        function handleFile(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        generateASCII(imageData);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function generateASCII(imageData) {
+            if (!wasmModule) {
+                console.error('WebAssembly module not loaded');
+                return;
+            }
+
+            const outputWidth = parseInt(outputWidthInput.value, 10);
+            const { width, height, data } = imageData;
+            const channels = 4; // RGBA
+
+            const imagePtr = wasmModule._malloc(width * height * channels);
+            wasmModule.HEAPU8.set(data, imagePtr);
+
+            const asciiPtr = wasmModule.ccall(
+                'generate_ascii_wasm',
+                'number',
+                ['number', 'number', 'number', 'number', 'number'],
+                [imagePtr, width, height, channels, outputWidth]
+            );
+
+            const asciiArt = wasmModule.UTF8ToString(asciiPtr);
+            output.textContent = asciiArt;
+
+            wasmModule._free(imagePtr);
+            wasmModule._free(asciiPtr);
+        }
+    </script>
+</body>
+</html>

@@ -1,5 +1,3 @@
-// main.c
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,6 +7,10 @@
 #include "ascii_converter.h"
 #include "utils.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 #define DEFAULT_OUTPUT_WIDTH 100
 
 void print_usage(const char* program_name) {
@@ -16,6 +18,43 @@ void print_usage(const char* program_name) {
     printf("  input_image: Path to the input image file\n");
     printf("  output_width: Width of the output ASCII art (default: %d)\n", DEFAULT_OUTPUT_WIDTH);
 }
+
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+char* generate_ascii_wasm(unsigned char* image_data, int width, int height, int channels, int output_width) {
+    Image img = {
+        .data = image_data,
+        .width = width,
+        .height = height,
+        .channels = channels
+    };
+
+    Image blurred = apply_gaussian_blur(&img, 5, 1.0f);
+    Image edges = apply_dog_edge_detection(&blurred, 5, 1.0f, 1.6f, 0.99f, 0.1f);
+    EdgeInfo edge_info = apply_sobel_edge_detection(&blurred);
+    Image quantized_directions = quantize_edge_direction(&edge_info.direction);
+    ASCIIArt ascii_art = convert_to_ascii(&blurred, &quantized_directions, output_width);
+
+    int total_size = ascii_art.width * ascii_art.height + ascii_art.height;
+    char* result = (char*)malloc(total_size + 1);
+    char* ptr = result;
+    for (int y = 0; y < ascii_art.height; y++) {
+        for (int x = 0; x < ascii_art.width; x++) {
+            *ptr++ = ascii_art.data[y * ascii_art.width + x];
+        }
+        *ptr++ = '\n';
+    }
+    *ptr = '\0';
+
+    free_image(&blurred);
+    free_image(&edges);
+    free_edge_info(&edge_info);
+    free_image(&quantized_directions);
+    free_ascii_art(&ascii_art);
+
+    return result;
+}
+#endif
 
 int main(int argc, char* argv[]) {
     if (argc < 2 || argc > 3) {

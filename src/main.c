@@ -19,24 +19,6 @@ void print_usage(const char* program_name) {
     printf("  output_width: Width of the output ASCII art (default: %d)\n", DEFAULT_OUTPUT_WIDTH);
 }
 
-char* convert_to_ascii_string(const ASCIIArt* ascii_art) {
-    // Calculate the total size needed for the string
-    int total_size = ascii_art->width * ascii_art->height + 1;
-    char* result = (char*)malloc(total_size);
-    if (!result) {
-        fprintf(stderr, "Memory allocation failed\n");
-        return NULL;
-    }
-
-    char* ptr = result;
-    for (int i = 0; i < ascii_art->width * ascii_art->height; i++) {
-        *ptr++ = ascii_art->data[i];
-    }
-    *ptr = '\0';
-
-    return result;
-}
-
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE
 char* generate_ascii_wasm(unsigned char* image_data, int width, int height, int channels, int output_width) {
@@ -53,7 +35,15 @@ char* generate_ascii_wasm(unsigned char* image_data, int width, int height, int 
     Image quantized_directions = quantize_edge_direction(&edge_info.direction);
     ASCIIArt ascii_art = convert_to_ascii(&blurred, &quantized_directions, output_width);
 
-    char* result = convert_to_ascii_string(&ascii_art);
+    // Allocate memory for the result string
+    char* result = (char*)malloc(strlen(ascii_art.data) + 1);
+    if (!result) {
+        fprintf(stderr, "Memory allocation failed\n");
+        return NULL;
+    }
+
+    // Copy the ASCII art data to the result string
+    strcpy(result, ascii_art.data);
 
     free_image(&blurred);
     free_image(&edges);
@@ -111,7 +101,15 @@ int main(int argc, char* argv[]) {
     printf("ASCII art saved to %s\n", output_filename);
 
     //testing string parser
-    // char* result = convert_to_ascii_string(&ascii_art);
+    // // Allocate memory for the result string
+    // char* result = (char*)malloc(strlen(ascii_art.data) + 1);
+    // if (!result) {
+    //     fprintf(stderr, "Memory allocation failed\n");
+    //     return EXIT_FAILURE;
+    // }
+
+    // // Copy the ASCII art data to the result string
+    // strcpy(result, ascii_art.data);
     // printf("string parser results %s",result);
 
     // Clean up

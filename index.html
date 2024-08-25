@@ -16,16 +16,23 @@
             color: #333;
             text-align: center;
         }
+        #dropzone-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+        }
         #dropzone {
             border: 2px dashed #ccc;
             border-radius: 20px;
-            width: 100%;
+            width: 800px;
             height: 200px;
             display: flex;
             justify-content: center;
             align-items: center;
             cursor: pointer;
-            transition: background-color 0.3s;
+            transition: all 0.3s;
             overflow: hidden;
             position: relative;
         }
@@ -38,12 +45,13 @@
         #dropzone-text {
             position: absolute;
             z-index: 1;
+            pointer-events: none;
         }
         #preview-image {
             max-width: 100%;
             max-height: 100%;
-            object-fit: contain;
             display: none;
+            object-fit: contain;
         }
         #output {
             white-space: pre;
@@ -86,9 +94,11 @@
 </head>
 <body>
     <h1>ASCII Art Generator</h1>
-    <div id="dropzone">
-        <span id="dropzone-text">Drop an image here or click to upload</span>
-        <img id="preview-image" alt="Preview">
+    <div id="dropzone-container">
+        <div id="dropzone">
+            <span id="dropzone-text">Drop an image here or click to upload</span>
+            <img id="preview-image" alt="Preview">
+        </div>
     </div>
     <div id="width-input">
         <label for="output-width">Output Width:</label>
@@ -106,6 +116,7 @@
             console.log('WebAssembly module loaded');
         };
 
+        const dropzoneContainer = document.getElementById('dropzone-container');
         const dropzone = document.getElementById('dropzone');
         const dropzoneText = document.getElementById('dropzone-text');
         const previewImage = document.getElementById('preview-image');
@@ -149,6 +160,14 @@
                         previewImage.src = e.target.result;
                         previewImage.style.display = 'block';
                         dropzoneText.style.display = 'none';
+
+                        // Calculate 50% of the original image size
+                        const scaledWidth = Math.round(img.width * 0.5);
+                        const scaledHeight = Math.round(img.height * 0.5);
+
+                        // Resize dropzone to match 50% of the image dimensions
+                        dropzone.style.width = scaledWidth + 'px';
+                        dropzone.style.height = scaledHeight + 'px';
 
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');

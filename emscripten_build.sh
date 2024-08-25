@@ -24,7 +24,6 @@ emcc $SRCS -o $OUTPUT.js \
     -s INITIAL_MEMORY=256MB \
     -s ASYNCIFY=1 \
     -s FORCE_FILESYSTEM=1 \
-    --preload-file examples \
     -O3 \
     -I include
 

@@ -36,13 +36,14 @@
         #output {
             white-space: pre;
             font-family: monospace;
-            font-size: 8px;
             line-height: 1;
             overflow: auto;
             background-color: white;
             padding: 10px;
             border-radius: 5px;
             margin-top: 20px;
+            width: 100%;
+            box-sizing: border-box;
         }
         #width-input {
             margin-top: 10px;
@@ -148,9 +149,45 @@
             const asciiArt = wasmModule.UTF8ToString(asciiPtr);
             output.textContent = asciiArt;
 
+            // Adjust font size to fit the desired width
+            adjustFontSize();
+
             wasmModule._free(imagePtr);
             wasmModule._free(asciiPtr);
         }
+
+        function adjustFontSize() {
+            const desiredWidth = parseInt(outputWidthInput.value, 10);
+            const containerWidth = output.offsetWidth;
+            
+            // Start with a small font size
+            let fontSize = 1;
+            output.style.fontSize = `${fontSize}px`;
+            
+            // Increase font size until the content width exceeds the container width
+            while (output.scrollWidth <= containerWidth && fontSize < 20) {
+                fontSize++;
+                output.style.fontSize = `${fontSize}px`;
+            }
+            
+            // Decrease font size by 1 to ensure it fits
+            fontSize--;
+            output.style.fontSize = `${fontSize}px`;
+        }
+
+        // Update ASCII art when output width changes
+        outputWidthInput.addEventListener('change', () => {
+            const img = document.querySelector('img');
+            if (img) {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                generateASCII(imageData);
+            }
+        });
     </script>
 </body>
 </html>

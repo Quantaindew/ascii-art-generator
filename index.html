@@ -26,12 +26,24 @@
             align-items: center;
             cursor: pointer;
             transition: background-color 0.3s;
+            overflow: hidden;
+            position: relative;
         }
         #dropzone:hover {
             background-color: #e0e0e0;
         }
         #dropzone.dragover {
             background-color: #d0d0d0;
+        }
+        #dropzone-text {
+            position: absolute;
+            z-index: 1;
+        }
+        #preview-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            display: none;
         }
         #output {
             white-space: pre;
@@ -67,7 +79,6 @@
             transition: background-color 0.3s;
         }
         #copy-button:hover {
-            
             background-color: #333;
             color: white;
         }
@@ -75,7 +86,10 @@
 </head>
 <body>
     <h1>ASCII Art Generator</h1>
-    <div id="dropzone">Drop an image here or click to upload</div>
+    <div id="dropzone">
+        <span id="dropzone-text">Drop an image here or click to upload</span>
+        <img id="preview-image" alt="Preview">
+    </div>
     <div id="width-input">
         <label for="output-width">Output Width:</label>
         <input type="number" id="output-width" value="100" min="1" max="1000">
@@ -93,6 +107,8 @@
         };
 
         const dropzone = document.getElementById('dropzone');
+        const dropzoneText = document.getElementById('dropzone-text');
+        const previewImage = document.getElementById('preview-image');
         const output = document.getElementById('output');
         const outputWidthInput = document.getElementById('output-width');
         const copyButton = document.getElementById('copy-button');
@@ -130,6 +146,10 @@
                 reader.onload = (e) => {
                     const img = new Image();
                     img.onload = () => {
+                        previewImage.src = e.target.result;
+                        previewImage.style.display = 'block';
+                        dropzoneText.style.display = 'none';
+
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
                         canvas.width = img.width;
@@ -198,12 +218,12 @@
 
         // Update ASCII art when output width changes
         outputWidthInput.addEventListener('change', () => {
-            const img = document.querySelector('img');
-            if (img) {
+            const img = document.querySelector('#preview-image');
+            if (img.src) {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-                canvas.width = img.width;
-                canvas.height = img.height;
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
                 ctx.drawImage(img, 0, 0);
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 generateASCII(imageData);

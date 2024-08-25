@@ -1,7 +1,7 @@
 *.png
 *.o
 *.wasm
-ascii_generator
+ascii_generator*
 *.txt
 codebase.md
 .data
@@ -10,3 +10,5 @@ codebase.md
 *.gif
 *.bmp
 *.tiff
+ascii_generator.js
+ascii_generator.wasm

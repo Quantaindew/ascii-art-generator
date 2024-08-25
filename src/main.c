@@ -19,6 +19,24 @@ void print_usage(const char* program_name) {
     printf("  output_width: Width of the output ASCII art (default: %d)\n", DEFAULT_OUTPUT_WIDTH);
 }
 
+char* convert_to_ascii_string(const ASCIIArt* ascii_art) {
+    // Calculate the total size needed for the string
+    int total_size = ascii_art->width * ascii_art->height + 1;
+    char* result = (char*)malloc(total_size);
+    if (!result) {
+        fprintf(stderr, "Memory allocation failed\n");
+        return NULL;
+    }
+
+    char* ptr = result;
+    for (int i = 0; i < ascii_art->width * ascii_art->height; i++) {
+        *ptr++ = ascii_art->data[i];
+    }
+    *ptr = '\0';
+
+    return result;
+}
+
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE
 char* generate_ascii_wasm(unsigned char* image_data, int width, int height, int channels, int output_width) {
@@ -35,16 +53,7 @@ char* generate_ascii_wasm(unsigned char* image_data, int width, int height, int 
     Image quantized_directions = quantize_edge_direction(&edge_info.direction);
     ASCIIArt ascii_art = convert_to_ascii(&blurred, &quantized_directions, output_width);
 
-    int total_size = ascii_art.width * ascii_art.height + ascii_art.height;
-    char* result = (char*)malloc(total_size + 1);
-    char* ptr = result;
-    for (int y = 0; y < ascii_art.height; y++) {
-        for (int x = 0; x < ascii_art.width; x++) {
-            *ptr++ = ascii_art.data[y * ascii_art.width + x];
-        }
-        *ptr++ = '\n';
-    }
-    *ptr = '\0';
+    char* result = convert_to_ascii_string(&ascii_art);
 
     free_image(&blurred);
     free_image(&edges);
@@ -100,6 +109,10 @@ int main(int argc, char* argv[]) {
     save_ascii_art(&ascii_art, output_filename);
 
     printf("ASCII art saved to %s\n", output_filename);
+
+    //testing string parser
+    // char* result = convert_to_ascii_string(&ascii_art);
+    // printf("string parser results %s",result);
 
     // Clean up
     free_image(&img);

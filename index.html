@@ -11,9 +11,14 @@
             margin: 0 auto;
             padding: 20px;
             background-color: #f0f0f0;
+            color: #333;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        body.dark-theme {
+            background-color: #333;
+            color: #f0f0f0;
         }
         h1 {
-            color: #333;
             text-align: center;
         }
         #dropzone-container {
@@ -39,8 +44,14 @@
         #dropzone:hover {
             background-color: #e0e0e0;
         }
+        body.dark-theme #dropzone:hover {
+            background-color: #444;
+        }
         #dropzone.dragover {
             background-color: #d0d0d0;
+        }
+        body.dark-theme #dropzone.dragover {
+            background-color: #555;
         }
         #dropzone-text {
             position: absolute;
@@ -59,11 +70,16 @@
             line-height: 1;
             overflow: auto;
             background-color: white;
+            color: #333;
             padding: 10px;
             border-radius: 5px;
             margin-top: 20px;
             width: 100%;
             box-sizing: border-box;
+        }
+        body.dark-theme #output {
+            background-color: #222;
+            color: #f0f0f0;
         }
         #width-input {
             margin-top: 10px;
@@ -79,21 +95,53 @@
             display: block;
             margin: 20px auto;
             padding: 10px 20px;
-            background-color: white;
+            background-color: #f0f0f0;
             color: #333;
             border: none;
             border-radius: 5px;
             cursor: pointer;
-            transition: background-color 0.3s;
+            transition: background-color 0.3s, color 0.3s;
         }
         #copy-button:hover {
             background-color: #333;
-            color: white;
+            color: #f0f0f0;
+        }
+        body.dark-theme #copy-button {
+            background-color: #333;
+            color: #f0f0f0;
+        }
+        body.dark-theme #copy-button:hover {
+            background-color: #f0f0f0;
+            color: #333;
+        }
+        #theme-toggle {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background-color: #f0f0f0;
+        color: #333;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        cursor: pointer;
+        transition: background-color 0.3s, color 0.3s;
+        font-size: 21px;
+        font-weight: bold;
+        }
+
+        body.dark-theme #theme-toggle {
+            background-color: #333;
+            color: #f0f0f0;
+        }
+
+        #theme-toggle:hover {
+            transform: scale(1.05);  /* Added slight scale effect on hover */
         }
     </style>
 </head>
 <body>
     <h1>ASCII Art Generator</h1>
+    <button id="theme-toggle">🌞</button>
     <div id="dropzone-container">
         <div id="dropzone">
             <span id="dropzone-text">Drop an image here or click to upload</span>
@@ -123,6 +171,7 @@
         const output = document.getElementById('output');
         const outputWidthInput = document.getElementById('output-width');
         const copyButton = document.getElementById('copy-button');
+        const themeToggle = document.getElementById('theme-toggle');
 
         dropzone.addEventListener('click', () => {
             const input = document.createElement('input');
@@ -258,6 +307,12 @@
                 console.error('Failed to copy: ', err);
                 alert('Failed to copy ASCII art. Please try again.');
             });
+        });
+
+        // Theme toggle functionality
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-theme');
+            themeToggle.textContent = document.body.classList.contains('dark-theme') ? '🌙' : '🌞' ;
         });
     </script>
 </body>

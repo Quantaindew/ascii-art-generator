@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include "image_loader.h"
 #include "gaussian_blur.h"
 #include "edge_detection.h"
@@ -14,14 +15,15 @@
 #define DEFAULT_OUTPUT_WIDTH 100
 
 void print_usage(const char* program_name) {
-    printf("Usage: %s <input_image> [output_width]\n", program_name);
+    printf("Usage: %s <input_image> [output_width] [--color|-c]\n", program_name);
     printf("  input_image: Path to the input image file\n");
     printf("  output_width: Width of the output ASCII art (default: %d)\n", DEFAULT_OUTPUT_WIDTH);
+    printf("  --color|-c: Enable color output for console (optional)\n");
 }
 
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE
-char* generate_ascii_wasm(unsigned char* image_data, int width, int height, int channels, int output_width) {
+char* generate_ascii_wasm(unsigned char* image_data, int width, int height, int channels, int output_width, bool use_color) {
     Image img = {
         .data = image_data,
         .width = width,
@@ -33,17 +35,17 @@ char* generate_ascii_wasm(unsigned char* image_data, int width, int height, int 
     Image edges = apply_dog_edge_detection(&blurred, 5, 1.0f, 1.6f, 0.99f, 0.1f);
     EdgeInfo edge_info = apply_sobel_edge_detection(&blurred);
     Image quantized_directions = quantize_edge_direction(&edge_info.direction);
-    ASCIIArt ascii_art = convert_to_ascii(&blurred, &quantized_directions, output_width);
+    ASCIIArt ascii_art = convert_to_ascii_with_color(&blurred, &quantized_directions, output_width);
 
     // Allocate memory for the result string
-    char* result = (char*)malloc(strlen(ascii_art.data) + 1);
+    char* result = (char*)malloc(strlen(use_color ? ascii_art.color_data : ascii_art.data) + 1);
     if (!result) {
         fprintf(stderr, "Memory allocation failed\n");
         return NULL;
     }
 
-    // Copy the ASCII art data to the result string
-    strcpy(result, ascii_art.data);
+    // Copy the appropriate ASCII art data to the result string
+    strcpy(result, use_color ? ascii_art.color_data : ascii_art.data);
 
     free_image(&blurred);
     free_image(&edges);
@@ -56,17 +58,28 @@ char* generate_ascii_wasm(unsigned char* image_data, int width, int height, int 
 #endif
 
 int main(int argc, char* argv[]) {
-    if (argc < 2 || argc > 3) {
+    if (argc < 2 || argc > 5) {
         print_usage(argv[0]);
         return EXIT_FAILURE;
     }
 
     const char* input_filename = argv[1];
-    int output_width = (argc == 3) ? atoi(argv[2]) : DEFAULT_OUTPUT_WIDTH;
+    int output_width = DEFAULT_OUTPUT_WIDTH;
+    bool use_color = false;
 
-    if (output_width <= 0) {
-        fprintf(stderr, "Error: Invalid output width\n");
-        return EXIT_FAILURE;
+    // Parse command-line arguments
+    for (int i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "--color") == 0 || strcmp(argv[i], "-c") == 0) {
+            use_color = true;
+        } else {
+            int width = atoi(argv[i]);
+            if (width > 0) {
+                output_width = width;
+            } else {
+                fprintf(stderr, "Error: Invalid output width\n");
+                return EXIT_FAILURE;
+            }
+        }
     }
 
     // Load the image
@@ -88,29 +101,30 @@ int main(int argc, char* argv[]) {
     // Quantize edge directions
     Image quantized_directions = quantize_edge_direction(&edge_info.direction);
 
-    // Convert to ASCII
-    ASCIIArt ascii_art = convert_to_ascii(&blurred, &quantized_directions, output_width);
+    // Convert to ASCII with color
+    ASCIIArt ascii_art = convert_to_ascii_with_color(&blurred, &quantized_directions, output_width);
+    if (ascii_art.data == NULL || ascii_art.color_data == NULL) {
+        fprintf(stderr, "Error: Failed to convert image to ASCII art\n");
+        // Clean up and return
+        free_image(&img);
+        free_image(&blurred);
+        free_image(&edges);
+        free_edge_info(&edge_info);
+        free_image(&quantized_directions);
+        return EXIT_FAILURE;
+    }
 
     // Generate output filename
     char output_filename[256];
     snprintf(output_filename, sizeof(output_filename), "%s_ascii.txt", input_filename);
 
-    // Save ASCII art
+    // Save ASCII art (always saves non-color version)
     save_ascii_art(&ascii_art, output_filename);
 
     printf("ASCII art saved to %s\n", output_filename);
 
-    //testing string parser
-    // // Allocate memory for the result string
-    // char* result = (char*)malloc(strlen(ascii_art.data) + 1);
-    // if (!result) {
-    //     fprintf(stderr, "Memory allocation failed\n");
-    //     return EXIT_FAILURE;
-    // }
-
-    // // Copy the ASCII art data to the result string
-    // strcpy(result, ascii_art.data);
-    // printf("string parser results %s",result);
+    // Print ASCII art to console (use color if specified)
+    printf("%s", use_color ? ascii_art.color_data : ascii_art.data);
 
     // Clean up
     free_image(&img);

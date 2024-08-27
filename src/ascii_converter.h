@@ -8,12 +8,13 @@
 // Structure to hold ASCII art result
 typedef struct {
     char* data;
+    char* color_data;  // New field for color information
     int width;
     int height;
 } ASCIIArt;
 
-// Convert image to ASCII art
-ASCIIArt convert_to_ascii(const Image* image, const Image* edges, int ascii_width);
+// Convert image to ASCII art with color
+ASCIIArt convert_to_ascii_with_color(const Image* image, const Image* edges, int ascii_width);
 
 // Free ASCII art structure
 void free_ascii_art(ASCIIArt* ascii_art);

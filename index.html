@@ -115,27 +115,65 @@
             color: #333;
         }
         #theme-toggle {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        background-color: #f0f0f0;
-        color: #333;
-        border: none;
-        border-radius: 5px;
-        padding: 10px 20px;
-        cursor: pointer;
-        transition: background-color 0.3s, color 0.3s;
-        font-size: 21px;
-        font-weight: bold;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: #f0f0f0;
+            color: #333;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: background-color 0.3s, color 0.3s;
+            font-size: 21px;
+            font-weight: bold;
         }
-
         body.dark-theme #theme-toggle {
             background-color: #333;
             color: #f0f0f0;
         }
-
         #theme-toggle:hover {
-            transform: scale(1.05);  /* Added slight scale effect on hover */
+            transform: scale(1.05);
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+            margin-left: 10px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
         }
     </style>
 </head>
@@ -151,10 +189,16 @@
     <div id="width-input">
         <label for="output-width">Output Width:</label>
         <input type="number" id="output-width" value="320" min="1" max="1000000">
+        <label for="color-toggle" style="margin-left: 20px;">Color Mode:</label>
+        <label class="switch">
+            <input type="checkbox" id="color-toggle">
+            <span class="slider"></span>
+        </label>
     </div>
     <div id="output"></div>
     <button id="copy-button" style="display: none;">Copy to Clipboard</button>
 
+    <script src="https://cdn.jsdelivr.net/npm/ansi_up@5.0.1/ansi_up.min.js"></script>
     <script src="ascii_generator.js"></script>
     <script>
         let wasmModule;
@@ -172,6 +216,8 @@
         const outputWidthInput = document.getElementById('output-width');
         const copyButton = document.getElementById('copy-button');
         const themeToggle = document.getElementById('theme-toggle');
+        const colorToggle = document.getElementById('color-toggle');
+        const ansi_up = new AnsiUp();
 
         dropzone.addEventListener('click', () => {
             const input = document.createElement('input');
@@ -210,11 +256,9 @@
                         previewImage.style.display = 'block';
                         dropzoneText.style.display = 'none';
 
-                        // Calculate 50% of the original image size
                         const scaledWidth = Math.round(img.width * 0.5);
                         const scaledHeight = Math.round(img.height * 0.5);
 
-                        // Resize dropzone to match 50% of the image dimensions
                         dropzone.style.width = scaledWidth + 'px';
                         dropzone.style.height = scaledHeight + 'px';
 
@@ -248,20 +292,23 @@
             const asciiPtr = wasmModule.ccall(
                 'generate_ascii_wasm',
                 'number',
-                ['number', 'number', 'number', 'number', 'number'],
-                [imagePtr, width, height, channels, outputWidth]
+                ['number', 'number', 'number', 'number', 'number', 'number'],
+                [imagePtr, width, height, channels, outputWidth, colorToggle.checked ? 1 : 0]
             );
 
             const asciiArt = wasmModule.UTF8ToString(asciiPtr);
-            output.textContent = asciiArt;
+            
+            if (colorToggle.checked) {
+                output.innerHTML = ansi_up.ansi_to_html(asciiArt);
+            } else {
+                output.textContent = asciiArt;
+            }
 
-            // Adjust font size to fit the desired width
             adjustFontSize();
 
             wasmModule._free(imagePtr);
             wasmModule._free(asciiPtr);
 
-            // Show the copy button
             copyButton.style.display = 'block';
         }
 
@@ -269,23 +316,22 @@
             const desiredWidth = parseInt(outputWidthInput.value, 10);
             const containerWidth = output.offsetWidth;
             
-            // Start with a small font size
             let fontSize = 1;
             output.style.fontSize = `${fontSize}px`;
             
-            // Increase font size until the content width exceeds the container width
             while (output.scrollWidth <= containerWidth && fontSize < 20) {
                 fontSize++;
                 output.style.fontSize = `${fontSize}px`;
             }
             
-            // Decrease font size by 1 to ensure it fits
             fontSize--;
             output.style.fontSize = `${fontSize}px`;
         }
 
-        // Update ASCII art when output width changes
-        outputWidthInput.addEventListener('change', () => {
+        outputWidthInput.addEventListener('change', regenerateASCII);
+        colorToggle.addEventListener('change', regenerateASCII);
+
+        function regenerateASCII() {
             const img = document.querySelector('#preview-image');
             if (img.src) {
                 const canvas = document.createElement('canvas');
@@ -296,11 +342,10 @@
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 generateASCII(imageData);
             }
-        });
+        }
 
-        // Copy to clipboard functionality
         copyButton.addEventListener('click', () => {
-            const asciiArt = output.textContent;
+            const asciiArt = colorToggle.checked ? output.innerText : output.textContent;
             navigator.clipboard.writeText(asciiArt).then(() => {
                 alert('ASCII art copied to clipboard!');
             }).catch(err => {
@@ -309,10 +354,9 @@
             });
         });
 
-        // Theme toggle functionality
         themeToggle.addEventListener('click', () => {
             document.body.classList.toggle('dark-theme');
-            themeToggle.textContent = document.body.classList.contains('dark-theme') ? '🌙' : '🌞' ;
+            themeToggle.textContent = document.body.classList.contains('dark-theme') ? '🌙' : '🌞';
         });
     </script>
 </body>

@@ -63,3 +63,44 @@ Image apply_gaussian_blur(const Image* src, int kernel_size, float sigma) {
 
     return result;
 }
+
+// New function optimized for single-channel images (for bloom effect)
+Image apply_gaussian_blur_single_channel(const Image* src, int kernel_size, float sigma) {
+    float* kernel = create_gaussian_kernel(kernel_size, sigma);
+
+    Image temp = create_image(src->width, src->height, 1);
+    Image result = create_image(src->width, src->height, 1);
+    int half = kernel_size / 2;
+
+    // Apply horizontal blur
+    for (int y = 0; y < src->height; y++) {
+        for (int x = 0; x < src->width; x++) {
+            float sum = 0.0f;
+            for (int i = -half; i <= half; i++) {
+                int sx = clamp(x + i, 0, src->width - 1);
+                float pixel = get_pixel(src, sx, y, 0);
+                sum += pixel * kernel[i + half];
+            }
+            set_pixel(&temp, x, y, 0, sum);
+        }
+    }
+
+    // Apply vertical blur
+    for (int y = 0; y < src->height; y++) {
+        for (int x = 0; x < src->width; x++) {
+            float sum = 0.0f;
+            for (int i = -half; i <= half; i++) {
+                int sy = clamp(y + i, 0, src->height - 1);
+                float pixel = get_pixel(&temp, x, sy, 0);
+                sum += pixel * kernel[i + half];
+            }
+            set_pixel(&result, x, y, 0, sum);
+        }
+    }
+
+    // Clean up
+    free_image(&temp);
+    free(kernel);
+
+    return result;
+}

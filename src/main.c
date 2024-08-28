@@ -13,18 +13,22 @@
 #endif
 
 #define DEFAULT_OUTPUT_WIDTH 100
+#define DEFAULT_BLOOM_THRESHOLD 0.7f
+#define DEFAULT_BLOOM_INTENSITY 0.3f
 
 void print_usage(const char* program_name) {
-    printf("Usage: %s <input_image> [output_width] [--color|-c] [--edge|-e]\n", program_name);
+    printf("Usage: %s <input_image> [output_width] [--color|-c] [--edge|-e] [--bloom-threshold|-bth <value>] [--bloom-intensity|-bi <value>]\n", program_name);
     printf("  input_image: Path to the input image file\n");
     printf("  output_width: Width of the output ASCII art (default: %d)\n", DEFAULT_OUTPUT_WIDTH);
     printf("  --color|-c: Enable color output for console (optional)\n");
-    printf("  --edge|-e: Enable edge detection (optional, not implemented yet)\n");
+    printf("  --edge|-e: Enable edge detection (optional)\n");
+    printf("  --bloom-threshold|-bth <value>: Set bloom threshold (default: %.2f)\n", DEFAULT_BLOOM_THRESHOLD);
+    printf("  --bloom-intensity|-bi <value>: Set bloom intensity (default: %.2f)\n", DEFAULT_BLOOM_INTENSITY);
 }
 
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE
-char* generate_ascii_wasm(unsigned char* image_data, int width, int height, int channels, int output_width, bool use_color) {
+char* generate_ascii_wasm(unsigned char* image_data, int width, int height, int channels, int output_width, bool use_color, float bloom_threshold, float bloom_intensity) {
     Image img = {
         .data = image_data,
         .width = width,
@@ -36,7 +40,7 @@ char* generate_ascii_wasm(unsigned char* image_data, int width, int height, int 
     Image edges = apply_dog_edge_detection(&blurred, 5, 1.0f, 1.6f, 0.99f, 0.1f);
     EdgeInfo edge_info = apply_sobel_edge_detection(&blurred);
     Image quantized_directions = quantize_edge_direction(&edge_info.direction);
-    ASCIIArt ascii_art = convert_to_ascii_with_color(&blurred, &quantized_directions, output_width);
+    ASCIIArt ascii_art = convert_to_ascii_with_color(&blurred, &quantized_directions, output_width, bloom_threshold, bloom_intensity);
 
     // Allocate memory for the result string
     char* result = (char*)malloc(strlen(use_color ? ascii_art.color_data : ascii_art.data) + 1);
@@ -59,7 +63,7 @@ char* generate_ascii_wasm(unsigned char* image_data, int width, int height, int 
 #endif
 
 int main(int argc, char* argv[]) {
-    if (argc < 2 || argc > 6) {
+    if (argc < 2) {
         print_usage(argv[0]);
         return EXIT_FAILURE;
     }
@@ -68,6 +72,8 @@ int main(int argc, char* argv[]) {
     int output_width = DEFAULT_OUTPUT_WIDTH;
     bool use_color = false;
     bool use_edge_detection = false;
+    float bloom_threshold = DEFAULT_BLOOM_THRESHOLD;
+    float bloom_intensity = DEFAULT_BLOOM_INTENSITY;
 
     // Parse command-line arguments
     for (int i = 2; i < argc; i++) {
@@ -75,6 +81,10 @@ int main(int argc, char* argv[]) {
             use_color = true;
         } else if (strcmp(argv[i], "--edge") == 0 || strcmp(argv[i], "-e") == 0) {
             use_edge_detection = true;
+        } else if ((strcmp(argv[i], "--bloom-threshold") == 0 || strcmp(argv[i], "-bth") == 0) && i + 1 < argc) {
+            bloom_threshold = atof(argv[++i]);
+        } else if ((strcmp(argv[i], "--bloom-intensity") == 0 || strcmp(argv[i], "-bi") == 0) && i + 1 < argc) {
+            bloom_intensity = atof(argv[++i]);
         } else {
             int width = atoi(argv[i]);
             if (width > 0) {
@@ -101,15 +111,15 @@ int main(int argc, char* argv[]) {
     Image quantized_directions = {0};
 
     if (use_edge_detection) {
-        fprintf(stderr, "Warning: Edge detection is not implemented yet. Proceeding without edge detection.\n");
-        // TODO: Implement edge detection when it's working
-        // edges = apply_dog_edge_detection(&blurred, 5, 1.0f, 1.6f, 0.99f, 0.1f);
-        // EdgeInfo edge_info = apply_sobel_edge_detection(&blurred);
-        // quantized_directions = quantize_edge_direction(&edge_info.direction);
+        // Apply edge detection
+        edges = apply_dog_edge_detection(&blurred, 5, 1.0f, 1.6f, 0.99f, 0.1f);
+        EdgeInfo edge_info = apply_sobel_edge_detection(&blurred);
+        quantized_directions = quantize_edge_direction(&edge_info.direction);
+        free_edge_info(&edge_info);
     }
 
-    // Convert to ASCII with color
-    ASCIIArt ascii_art = convert_to_ascii_with_color(&blurred, &quantized_directions, output_width);
+    // Convert to ASCII with color and bloom effect
+    ASCIIArt ascii_art = convert_to_ascii_with_color(&blurred, &quantized_directions, output_width, bloom_threshold, bloom_intensity);
     if (ascii_art.data == NULL || ascii_art.color_data == NULL) {
         fprintf(stderr, "Error: Failed to convert image to ASCII art\n");
         // Clean up and return

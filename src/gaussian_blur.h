@@ -14,4 +14,7 @@ float* create_gaussian_kernel(int kernel_size, float sigma);
 // Apply a 1D convolution (used for separable Gaussian blur)
 Image apply_1d_convolution(const Image* src, const float* kernel, int kernel_size, int direction);
 
+// Apply Gaussian blur optimized for single-channel images (for bloom effect)
+Image apply_gaussian_blur_single_channel(const Image* src, int kernel_size, float sigma);
+
 #endif // GAUSSIAN_BLUR_H

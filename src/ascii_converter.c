@@ -2,6 +2,7 @@
 
 #include "ascii_converter.h"
 #include "utils.h"
+#include "gaussian_blur.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,12 +37,65 @@ char* get_ascii_char(float intensity, int is_edge, int edge_direction) {
 
 char* get_color_code(float r, float g, float b) {
     static char color_code[20];
+    // Clamp RGB values to [0, 1] range
+    r = clamp(r, 0.0f, 1.0f);
+    g = clamp(g, 0.0f, 1.0f);
+    b = clamp(b, 0.0f, 1.0f);
     snprintf(color_code, sizeof(color_code), "\x1b[38;2;%d;%d;%dm", 
              (int)(r * 255), (int)(g * 255), (int)(b * 255));
     return color_code;
 }
 
-ASCIIArt convert_to_ascii_with_color(const Image* image, const Image* edges, int ascii_width) {
+Image create_bloom_map(const Image* image, float threshold) {
+    Image bloom_map = create_image(image->width, image->height, 1);
+    
+    for (int y = 0; y < image->height; y++) {
+        for (int x = 0; x < image->width; x++) {
+            float intensity = 0;
+            for (int c = 0; c < image->channels; c++) {
+                intensity += get_pixel(image, x, y, c);
+            }
+            intensity /= image->channels;
+            
+            float bloom_value = intensity > threshold ? intensity : 0;
+            set_pixel(&bloom_map, x, y, 0, bloom_value);
+        }
+    }
+    
+    return bloom_map;
+}
+
+Image blur_bloom_map(const Image* bloom_map, int kernel_size, float sigma) {
+    return apply_gaussian_blur(bloom_map, kernel_size, sigma);
+}
+
+Image apply_bloom_effect(const Image* image, const Image* blurred_bloom_map, float intensity) {
+    Image result = create_image(image->width, image->height, image->channels);
+    
+    for (int y = 0; y < image->height; y++) {
+        for (int x = 0; x < image->width; x++) {
+            for (int c = 0; c < image->channels; c++) {
+                float original = get_pixel(image, x, y, c);
+                float bloom = get_pixel(blurred_bloom_map, x, y, 0);
+                float new_value = original + bloom * intensity;
+                set_pixel(&result, x, y, c, new_value);
+            }
+        }
+    }
+    
+    return result;
+}
+
+ASCIIArt convert_to_ascii_with_color(const Image* image, const Image* edges, int ascii_width, float bloom_threshold, float bloom_intensity) {
+    // Create bloom map
+    Image bloom_map = create_bloom_map(image, bloom_threshold);
+    
+    // Blur bloom map
+    Image blurred_bloom_map = blur_bloom_map(&bloom_map, 5, 1.0f);
+    
+    // Apply bloom effect
+    Image bloomed_image = apply_bloom_effect(image, &blurred_bloom_map, bloom_intensity);
+    
     ASCIIArt ascii_art;
     ascii_art.width = ascii_width;
     ascii_art.height = (int)((float)image->height / image->width * ascii_width * 0.5f);
@@ -63,14 +117,14 @@ ASCIIArt convert_to_ascii_with_color(const Image* image, const Image* edges, int
             if (image_x < image->width && image_y < image->height) {
                 float intensity = 0;
                 float r = 0, g = 0, b = 0;
-                for (int c = 0; c < image->channels; c++) {
-                    float pixel = get_pixel(image, image_x, image_y, c);
+                for (int c = 0; c < bloomed_image.channels; c++) {
+                    float pixel = get_pixel(&bloomed_image, image_x, image_y, c);
                     intensity += pixel;
                     if (c == 0) r = pixel;
                     if (c == 1) g = pixel;
                     if (c == 2) b = pixel;
                 }
-                intensity /= image->channels;
+                intensity /= bloomed_image.channels;
 
                 int is_edge = (int)get_pixel(edges, image_x, image_y, 0);
                 int edge_direction = is_edge ? (int)(get_pixel(edges, image_x, image_y, 0) * 4) % 4 : 0;
@@ -99,6 +153,11 @@ ASCIIArt convert_to_ascii_with_color(const Image* image, const Image* edges, int
     }
     ascii_art.data[data_index] = '\0';
     ascii_art.color_data[color_index] = '\0';
+
+    // Clean up
+    free_image(&bloom_map);
+    free_image(&blurred_bloom_map);
+    free_image(&bloomed_image);
 
     return ascii_art;
 }

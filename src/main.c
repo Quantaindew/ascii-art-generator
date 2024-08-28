@@ -15,10 +15,11 @@
 #define DEFAULT_OUTPUT_WIDTH 100
 
 void print_usage(const char* program_name) {
-    printf("Usage: %s <input_image> [output_width] [--color|-c]\n", program_name);
+    printf("Usage: %s <input_image> [output_width] [--color|-c] [--edge|-e]\n", program_name);
     printf("  input_image: Path to the input image file\n");
     printf("  output_width: Width of the output ASCII art (default: %d)\n", DEFAULT_OUTPUT_WIDTH);
     printf("  --color|-c: Enable color output for console (optional)\n");
+    printf("  --edge|-e: Enable edge detection (optional, not implemented yet)\n");
 }
 
 #ifdef __EMSCRIPTEN__
@@ -58,7 +59,7 @@ char* generate_ascii_wasm(unsigned char* image_data, int width, int height, int 
 #endif
 
 int main(int argc, char* argv[]) {
-    if (argc < 2 || argc > 5) {
+    if (argc < 2 || argc > 6) {
         print_usage(argv[0]);
         return EXIT_FAILURE;
     }
@@ -66,11 +67,14 @@ int main(int argc, char* argv[]) {
     const char* input_filename = argv[1];
     int output_width = DEFAULT_OUTPUT_WIDTH;
     bool use_color = false;
+    bool use_edge_detection = false;
 
     // Parse command-line arguments
     for (int i = 2; i < argc; i++) {
         if (strcmp(argv[i], "--color") == 0 || strcmp(argv[i], "-c") == 0) {
             use_color = true;
+        } else if (strcmp(argv[i], "--edge") == 0 || strcmp(argv[i], "-e") == 0) {
+            use_edge_detection = true;
         } else {
             int width = atoi(argv[i]);
             if (width > 0) {
@@ -92,14 +96,17 @@ int main(int argc, char* argv[]) {
     // Apply Gaussian blur
     Image blurred = apply_gaussian_blur(&img, 5, 1.0f);
 
-    // Apply edge detection
-    Image edges = apply_dog_edge_detection(&blurred, 5, 1.0f, 1.6f, 0.99f, 0.1f);
+    // Initialize edges and quantized_directions as empty images
+    Image edges = {0};
+    Image quantized_directions = {0};
 
-    // Apply Sobel edge detection for direction information
-    EdgeInfo edge_info = apply_sobel_edge_detection(&blurred);
-
-    // Quantize edge directions
-    Image quantized_directions = quantize_edge_direction(&edge_info.direction);
+    if (use_edge_detection) {
+        fprintf(stderr, "Warning: Edge detection is not implemented yet. Proceeding without edge detection.\n");
+        // TODO: Implement edge detection when it's working
+        // edges = apply_dog_edge_detection(&blurred, 5, 1.0f, 1.6f, 0.99f, 0.1f);
+        // EdgeInfo edge_info = apply_sobel_edge_detection(&blurred);
+        // quantized_directions = quantize_edge_direction(&edge_info.direction);
+    }
 
     // Convert to ASCII with color
     ASCIIArt ascii_art = convert_to_ascii_with_color(&blurred, &quantized_directions, output_width);
@@ -108,9 +115,10 @@ int main(int argc, char* argv[]) {
         // Clean up and return
         free_image(&img);
         free_image(&blurred);
-        free_image(&edges);
-        free_edge_info(&edge_info);
-        free_image(&quantized_directions);
+        if (use_edge_detection) {
+            free_image(&edges);
+            free_image(&quantized_directions);
+        }
         return EXIT_FAILURE;
     }
 
@@ -129,9 +137,10 @@ int main(int argc, char* argv[]) {
     // Clean up
     free_image(&img);
     free_image(&blurred);
-    free_image(&edges);
-    free_edge_info(&edge_info);
-    free_image(&quantized_directions);
+    if (use_edge_detection) {
+        free_image(&edges);
+        free_image(&quantized_directions);
+    }
     free_ascii_art(&ascii_art);
 
     return EXIT_SUCCESS;
